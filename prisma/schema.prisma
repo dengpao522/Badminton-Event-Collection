@@ -65,6 +65,9 @@ model Event {
   updatedAt DateTime @updatedAt
 
   subscriptions Subscription[]
+  // 球馆发布者：运营采集的赛事为 null；球馆发布的记录提交用户（审核通过后上架）
+  submittedByUserId String?
+  submittedBy       User?   @relation(fields: [submittedByUserId], references: [id], onDelete: SetNull)
 
   @@index([city, category, status])
   @@index([raceDateStart])
@@ -125,4 +128,114 @@ model GapReason {
   updatedAt DateTime @updatedAt
 
   @@unique([city, category])
+}
+
+// ---------- 社区用户（爱好者 / 球馆，邮箱+密码注册）----------
+model User {
+  id    String @id @default(cuid())
+  email String @unique // 登录标识（小写）
+  passwordHash String // scrypt 哈希（salt 拼接存储，见 src/lib/password.ts）
+  name  String // 昵称（展示用）
+  bio   String @default("") // 个人简介（用户主页展示）
+  avatar String @default("") // 头像图片路径（public/uploads 下相对路径，空=默认头像）
+
+  createdAt DateTime @default(now())
+
+  // 关联
+  sessions   Session[]
+  venueProfile VenueProfile?
+  posts      Post[]
+  comments   Comment[]
+  likes      Like[]
+  // 关注关系（单向）：我关注的人 / 关注我的人
+  following  Follow[] @relation("follower")
+  followers  Follow[] @relation("following")
+  submittedEvents Event[] // 该用户（球馆）提交的赛事
+}
+
+// ---------- 登录会话（httpOnly cookie → session token）----------
+model Session {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token  String @unique // 随机 48 位 hex，cookie 存储
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+// ---------- 球馆资料 / 认证申请 ----------
+model VenueProfile {
+  id     String @id @default(cuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  venueName String // 球馆名称
+  city    String
+  address String @default("")
+  phone   String @default("")
+  intro   String @default("") // 场馆介绍（场地数、设施等）
+  // PENDING 待审核 / APPROVED 已认证（可发布赛事）/ REJECTED 已驳回
+  status  String @default("PENDING")
+  reviewNote String @default("")
+  createdAt DateTime @default(now())
+  reviewedAt DateTime?
+}
+
+// ---------- 社区帖子（作品）----------
+model Post {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title  String @default("") // 标题（可空，随笔类）
+  content String // 正文
+  images String @default("[]") // 图片路径 JSON 数组（public/uploads 相对路径）
+  likeCount    Int @default(0) // 点赞数（冗余计数，展示用）
+  commentCount Int @default(0) // 评论数（冗余计数，展示用）
+  createdAt DateTime @default(now())
+
+  comments Comment[]
+  likes    Like[]
+
+  @@index([createdAt])
+  @@index([userId])
+}
+
+// ---------- 帖子评论 ----------
+model Comment {
+  id     String @id @default(cuid())
+  postId String
+  post   Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  content String
+  createdAt DateTime @default(now())
+
+  @@index([postId])
+}
+
+// ---------- 帖子点赞（一人一帖最多一赞）----------
+model Like {
+  id     String @id @default(cuid())
+  postId String
+  post   Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([postId, userId])
+}
+
+// ---------- 单向关注（微博式：关注即看动态，无需对方同意）----------
+model Follow {
+  id String @id @default(cuid())
+  // follower 关注了 following
+  followerId  String
+  follower    User @relation("follower", fields: [followerId], references: [id], onDelete: Cascade)
+  followingId String
+  following   User @relation("following", fields: [followingId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([followerId, followingId])
+  @@index([followingId])
 }

@@ -234,3 +234,32 @@ export async function importSheetAction(formData: FormData) {
   });
   redirect(`/admin/import?${q.toString()}`);
 }
+
+/** 通过球馆认证：VENUE 角色生效，获得发布赛事权限 */
+export async function approveVenueAction(formData: FormData) {
+  await requireAdmin();
+  const id = String(formData.get('id') ?? '');
+  if (id) {
+    await prisma.venueProfile.update({
+      where: { id },
+      data: { status: 'APPROVED', reviewNote: '', reviewedAt: new Date() },
+    });
+  }
+  revalidatePath('/admin/venues');
+  redirect('/admin/venues?done=approved');
+}
+
+/** 驳回球馆认证：可填原因，球馆侧可修改后重新提交 */
+export async function rejectVenueAction(formData: FormData) {
+  await requireAdmin();
+  const id = String(formData.get('id') ?? '');
+  const note = String(formData.get('reviewNote') ?? '').trim().slice(0, 100);
+  if (id) {
+    await prisma.venueProfile.update({
+      where: { id },
+      data: { status: 'REJECTED', reviewNote: note, reviewedAt: new Date() },
+    });
+  }
+  revalidatePath('/admin/venues');
+  redirect('/admin/venues?done=rejected');
+}

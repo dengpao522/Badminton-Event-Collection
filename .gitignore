@@ -38,6 +38,9 @@ yarn-error.log*
 /prisma/*.db
 /prisma/*.db-journal
 
+# 用户上传内容（社区帖子图片，本地存储不入库）
+/public/uploads/
+
 # vercel
 .vercel
 
