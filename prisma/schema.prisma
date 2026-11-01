@@ -151,6 +151,9 @@ model User {
   following  Follow[] @relation("follower")
   followers  Follow[] @relation("following")
   submittedEvents Event[] // 该用户（球馆）提交的赛事
+  // 站内通知：我收到的 / 我触发的
+  notifications Notification[] @relation("notificationOwner")
+  notifiedActions Notification[] @relation("notificationActor")
 }
 
 // ---------- 登录会话（httpOnly cookie → session token）----------
@@ -224,6 +227,22 @@ model Like {
   createdAt DateTime @default(now())
 
   @@unique([postId, userId])
+}
+
+// ---------- 站内通知（被关注/被评论/被点赞）----------
+model Notification {
+  id     String @id @default(cuid())
+  userId String // 接收者
+  user   User   @relation("notificationOwner", fields: [userId], references: [id], onDelete: Cascade)
+  actorId String // 触发者（谁关注/评论/赞了你）
+  actor  User   @relation("notificationActor", fields: [actorId], references: [id], onDelete: Cascade)
+  // FOLLOW 关注 / COMMENT 评论 / LIKE 点赞
+  type   String
+  postId String? // 评论/点赞关联的帖子（关注类为 null）
+  read   Boolean @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([userId, read, createdAt])
 }
 
 // ---------- 单向关注（微博式：关注即看动态，无需对方同意）----------

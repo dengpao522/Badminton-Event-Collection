@@ -1,11 +1,22 @@
 import Link from 'next/link';
 import { logoutAction } from '@/lib/auth-actions';
 import { getCurrentUser } from '@/lib/session';
+import { prisma } from '@/lib/prisma';
+import { Avatar } from './Avatar';
 
 /** 站点头部：品牌标识 + 主导航 + 登录态（全羽运动） */
 export async function SiteHeader() {
   const user = await getCurrentUser();
   const isVenue = user?.venueProfile?.status === 'APPROVED';
+  // 未读通知数（已登录才查；查询失败按 0 处理不阻塞渲染）
+  let unread = 0;
+  if (user) {
+    try {
+      unread = await prisma.notification.count({ where: { userId: user.id, read: false } });
+    } catch {
+      unread = 0;
+    }
+  }
 
   return (
     <header className="sticky top-0 z-30 border-b border-gray-200 bg-white/90 backdrop-blur">
@@ -57,15 +68,33 @@ export async function SiteHeader() {
                   球馆入驻
                 </Link>
               )}
+              {/* 通知铃铛（未读红点） */}
+              <Link
+                href="/notifications"
+                aria-label="通知"
+                className="relative rounded-md px-2 py-1.5 text-lg hover:bg-gray-100"
+              >
+                🔔
+                {unread > 0 && (
+                  <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+                    {unread > 9 ? '9+' : unread}
+                  </span>
+                )}
+              </Link>
               {/* 我的主页（发帖/关注/提交的赛事） */}
               <Link
                 href={`/u/${user.id}`}
                 className="flex items-center gap-1.5 rounded-md px-2 py-1.5 hover:bg-brand-50 hover:text-brand-700"
               >
-                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-brand-100 text-xs font-bold text-brand-700">
-                  {user.name.slice(0, 1)}
-                </span>
+                <Avatar name={user.name} avatar={user.avatar} size={24} />
                 {user.name}
+              </Link>
+              {/* 账号设置 */}
+              <Link
+                href="/settings"
+                className="rounded-md px-2 py-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+              >
+                设置
               </Link>
               <form action={logoutAction}>
                 <button

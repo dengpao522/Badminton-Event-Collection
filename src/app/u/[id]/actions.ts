@@ -24,6 +24,10 @@ export async function toggleFollowAction(formData: FormData) {
     await prisma.follow.delete({ where: { id: existing.id } });
   } else {
     await prisma.follow.create({ data: { followerId: me.id, followingId: targetId } });
+    // 站内通知：告知被关注方
+    await prisma.notification.create({
+      data: { userId: targetId, actorId: me.id, type: 'FOLLOW' },
+    });
   }
   revalidatePath(back);
   revalidatePath(`/u/${targetId}`);

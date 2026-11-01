@@ -3,6 +3,7 @@ import type { Metadata } from 'next';
 import { prisma } from '@/lib/prisma';
 import { getCurrentUser } from '@/lib/session';
 import { toggleLikeAction, createCommentAction } from './actions';
+import { Avatar } from '@/components/Avatar';
 
 export const metadata: Metadata = { title: '社区' };
 export const dynamic = 'force-dynamic';
@@ -17,17 +18,32 @@ function timeAgo(date: Date): string {
   return date.toLocaleDateString('zh-CN');
 }
 
-/** 社区流：全站帖子按时间倒序（MVP 不做算法推荐），登录后可点赞/评论 */
+/**
+ * 社区流：最新 / 关注 两个 tab（登录可用关注流，只看关注的人+自己的帖子）
+ * 评论全量随帖加载（MVP 数据量小，正序展示）
+ */
 export default async function CommunityPage({
   searchParams,
 }: {
-  searchParams: Promise<{ page?: string }>;
+  searchParams: Promise<{ page?: string; tab?: string }>;
 }) {
   const me = await getCurrentUser();
-  const { page } = await searchParams;
+  const { page, tab } = await searchParams;
   const pageNum = Math.max(1, Number(page) || 1);
+  const activeTab = tab === 'following' && me ? 'following' : 'latest';
+
+  // 关注流范围：我关注的人 + 我自己（自己发帖也在关注流可见）
+  let followedIds: string[] = [];
+  if (activeTab === 'following' && me) {
+    const follows = await prisma.follow.findMany({
+      where: { followerId: me.id },
+      select: { followingId: true },
+    });
+    followedIds = [...follows.map((f) => f.followingId), me.id];
+  }
 
   const posts = await prisma.post.findMany({
+    where: activeTab === 'following' ? { userId: { in: followedIds } } : {},
     orderBy: { createdAt: 'desc' },
     skip: (pageNum - 1) * PAGE_SIZE,
     take: PAGE_SIZE + 1, // 多取一条判断是否有下一页
@@ -35,15 +51,42 @@ export default async function CommunityPage({
       user: { select: { id: true, name: true, avatar: true } },
       // 当前用户是否已点赞（用于按钮态）
       likes: me ? { where: { userId: me.id }, select: { id: true } } : false,
+      // 评论全量（正序），含作者名
+      comments: {
+        orderBy: { createdAt: 'asc' },
+        include: { user: { select: { id: true, name: true } } },
+      },
     },
   });
   const hasNext = posts.length > PAGE_SIZE;
   const list = posts.slice(0, PAGE_SIZE);
 
+  /** 分页链接保持当前 tab */
+  const pageHref = (p: number) => `/community?tab=${activeTab}&page=${p}`;
+
   return (
     <div className="mx-auto max-w-2xl px-4 py-8">
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-extrabold text-gray-900">球友社区</h1>
+        <div className="flex items-center gap-3">
+          <h1 className="text-xl font-extrabold text-gray-900">球友社区</h1>
+          {/* tab 切换 */}
+          <div className="flex rounded-lg bg-gray-100 p-0.5 text-xs font-semibold">
+            <Link
+              href="/community"
+              className={`rounded-md px-3 py-1.5 ${activeTab === 'latest' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'}`}
+            >
+              最新
+            </Link>
+            {me && (
+              <Link
+                href="/community?tab=following"
+                className={`rounded-md px-3 py-1.5 ${activeTab === 'following' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'}`}
+              >
+                关注
+              </Link>
+            )}
+          </div>
+        </div>
         {me ? (
           <Link
             href="/community/new"
@@ -70,9 +113,7 @@ export default async function CommunityPage({
               {/* 作者行 */}
               <div className="flex items-center gap-2.5">
                 <Link href={`/u/${post.user.id}`}>
-                  <span className="flex h-9 w-9 items-center justify-center rounded-full bg-brand-100 text-sm font-bold text-brand-700">
-                    {post.user.name.slice(0, 1)}
-                  </span>
+                  <Avatar name={post.user.name} avatar={post.user.avatar} size={36} />
                 </Link>
                 <div className="min-w-0">
                   <Link href={`/u/${post.user.id}`} className="text-sm font-bold text-gray-900 hover:text-brand-600">
@@ -100,45 +141,21 @@ export default async function CommunityPage({
               <div className="mt-3 flex items-center gap-4 border-t border-gray-100 pt-3 text-xs text-gray-500">
                 <span>
                   <b className="text-gray-700">{post.likeCount}</b> 赞 ·{' '}
-                  <b className="text-gray-700">{post.commentCount}</b> 评论
+                  <b className="text-gray-700">{post.comments.length}</b> 评论
                 </span>
                 {me ? (
-                  <>
-                    <form action={toggleLikeAction}>
-                      <input type="hidden" name="postId" value={post.id} />
-                      <input type="hidden" name="back" value="/community" />
-                      <button
-                        type="submit"
-                        className={`rounded-full px-2 py-1 font-semibold hover:bg-gray-100 ${
-                          liked ? 'text-red-500' : 'text-gray-500'
-                        }`}
-                      >
-                        {liked ? '♥' : '♡'} 点赞
-                      </button>
-                    </form>
-                    {/* 评论输入（折叠在 details 里保持流清爽） */}
-                    <details className="flex-1">
-                      <summary className="cursor-pointer select-none rounded-full px-2 py-1 hover:bg-gray-100">
-                        写评论
-                      </summary>
-                      <form action={createCommentAction} className="mt-2 flex gap-2">
-                        <input type="hidden" name="postId" value={post.id} />
-                        <input
-                          name="content"
-                          required
-                          maxLength={500}
-                          placeholder="说点什么…"
-                          className="flex-1 rounded-lg border border-gray-300 px-3 py-1.5 text-xs outline-none focus:border-brand-500"
-                        />
-                        <button
-                          type="submit"
-                          className="rounded-lg bg-brand-500 px-3 py-1.5 text-xs font-bold text-white hover:bg-brand-600"
-                        >
-                          发送
-                        </button>
-                      </form>
-                    </details>
-                  </>
+                  <form action={toggleLikeAction}>
+                    <input type="hidden" name="postId" value={post.id} />
+                    <input type="hidden" name="back" value={`/community?tab=${activeTab}&page=${pageNum}`} />
+                    <button
+                      type="submit"
+                      className={`rounded-full px-2 py-1 font-semibold hover:bg-gray-100 ${
+                        liked ? 'text-red-500' : 'text-gray-500'
+                      }`}
+                    >
+                      {liked ? '♥' : '♡'} 点赞
+                    </button>
+                  </form>
                 ) : (
                   <Link href="/login" className="text-brand-600 hover:underline">
                     登录后可点赞评论
@@ -146,12 +163,38 @@ export default async function CommunityPage({
                 )}
               </div>
 
-              {/* 评论列表 */}
-              {post.commentCount > 0 && (
-                <div className="mt-2 space-y-1.5 rounded-lg bg-gray-50 px-3 py-2">
-                  {/* 评论取最新若干条展示（MVP：全量取该帖评论的最近 5 条） */}
-                  <CommentList postId={post.id} />
+              {/* 评论列表（全量，正序） */}
+              {post.comments.length > 0 && (
+                <div className="mt-2 space-y-1.5 rounded-lg bg-gray-50 px-3 py-2.5">
+                  {post.comments.map((c) => (
+                    <p key={c.id} className="text-xs leading-5 text-gray-600">
+                      <Link href={`/u/${c.user.id}`} className="font-bold text-gray-800 hover:text-brand-600">
+                        {c.user.name}
+                      </Link>
+                      ：{c.content}
+                    </p>
+                  ))}
                 </div>
+              )}
+
+              {/* 评论输入 */}
+              {me && (
+                <form action={createCommentAction} className="mt-3 flex gap-2">
+                  <input type="hidden" name="postId" value={post.id} />
+                  <input
+                    name="content"
+                    required
+                    maxLength={500}
+                    placeholder="说点什么…"
+                    className="flex-1 rounded-lg border border-gray-300 px-3 py-1.5 text-xs outline-none focus:border-brand-500"
+                  />
+                  <button
+                    type="submit"
+                    className="rounded-lg bg-brand-500 px-3 py-1.5 text-xs font-bold text-white hover:bg-brand-600"
+                  >
+                    评论
+                  </button>
+                </form>
               )}
             </article>
           );
@@ -160,8 +203,17 @@ export default async function CommunityPage({
         {list.length === 0 && (
           <div className="rounded-2xl border border-dashed border-gray-300 bg-white p-12 text-center">
             <div className="text-4xl">🏸</div>
-            <p className="mt-3 text-sm font-bold text-gray-700">社区还没有内容</p>
-            <p className="mt-1 text-xs text-gray-400">发布第一个作品：约球心得、比赛战报、装备分享都欢迎</p>
+            {activeTab === 'following' ? (
+              <>
+                <p className="mt-3 text-sm font-bold text-gray-700">关注的人还没有发帖</p>
+                <p className="mt-1 text-xs text-gray-400">去「最新」里发现球友并关注，TA 的动态会出现在这里</p>
+              </>
+            ) : (
+              <>
+                <p className="mt-3 text-sm font-bold text-gray-700">社区还没有内容</p>
+                <p className="mt-1 text-xs text-gray-400">发布第一个作品：约球心得、比赛战报、装备分享都欢迎</p>
+              </>
+            )}
           </div>
         )}
       </div>
@@ -170,38 +222,19 @@ export default async function CommunityPage({
       {(pageNum > 1 || hasNext) && (
         <div className="mt-6 flex justify-between text-sm">
           {pageNum > 1 ? (
-            <Link href={`/community?page=${pageNum - 1}`} className="text-brand-600 hover:underline">
+            <Link href={pageHref(pageNum - 1)} className="text-brand-600 hover:underline">
               ← 上一页
             </Link>
           ) : (
             <span />
           )}
           {hasNext && (
-            <Link href={`/community?page=${pageNum + 1}`} className="text-brand-600 hover:underline">
+            <Link href={pageHref(pageNum + 1)} className="text-brand-600 hover:underline">
               下一页 →
             </Link>
           )}
         </div>
       )}
     </div>
-  );
-}
-
-/** 服务端子组件：取单帖最近 5 条评论（含作者名） */
-async function CommentList({ postId }: { postId: string }) {
-  const comments = await prisma.comment.findMany({
-    where: { postId },
-    orderBy: { createdAt: 'desc' },
-    take: 5,
-    include: { user: { select: { name: true } } },
-  });
-  return (
-    <>
-      {comments.map((c) => (
-        <p key={c.id} className="text-xs leading-5 text-gray-600">
-          <b className="text-gray-800">{c.user.name}</b>：{c.content}
-        </p>
-      ))}
-    </>
   );
 }

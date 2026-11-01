@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
 import { getCurrentUser } from '@/lib/session';
 import { toggleFollowAction } from './actions';
+import { Avatar } from '@/components/Avatar';
 
 export const dynamic = 'force-dynamic';
 
@@ -51,9 +52,7 @@ export default async function UserProfilePage({
       {/* 资料卡 */}
       <div className="rounded-2xl border border-gray-200 bg-white p-6">
         <div className="flex items-start gap-4">
-          <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-brand-100 text-xl font-bold text-brand-700">
-            {user.name.slice(0, 1)}
-          </span>
+          <Avatar name={user.name} avatar={user.avatar} size={56} />
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
               <h1 className="text-lg font-extrabold text-gray-900">{user.name}</h1>
