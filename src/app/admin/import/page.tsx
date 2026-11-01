@@ -1,5 +1,5 @@
 import { requireAdmin } from '@/lib/auth';
-import { CITIES } from '@/lib/constants';
+import { ALL_CITIES } from '@/lib/constants';
 import { importSheetAction } from '../actions';
 
 export const dynamic = 'force-dynamic';
@@ -43,7 +43,7 @@ export default async function AdminImportPage({
             required
             className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100"
           >
-            {CITIES.map((c) => (
+            {ALL_CITIES.map((c) => (
               <option key={c} value={c}>
                 {c}
               </option>

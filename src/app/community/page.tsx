@@ -142,7 +142,7 @@ export default async function CommunityPage({
                 <div className={`mt-3 grid gap-2 ${images.length === 1 ? '' : 'grid-cols-2 sm:grid-cols-3'}`}>
                   {images.map((src) => (
                     // eslint-disable-next-line @next/next/no-img-element -- 本地 uploads 原生展示
-                    <img key={src} src={src} alt="帖子图片" className="w-full rounded-lg object-cover" />
+                    <img key={src} src={src} alt="帖子图片" loading="lazy" className="w-full rounded-lg object-cover" />
                   ))}
                 </div>
               )}

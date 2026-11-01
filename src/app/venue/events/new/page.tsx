@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation';
 import type { Metadata } from 'next';
 import { submitVenueEventAction } from '../../actions';
 import { getCurrentUser, isApprovedVenue } from '@/lib/session';
-import { CITIES } from '@/lib/constants';
+import { ALL_CITIES } from '@/lib/constants';
 
 export const metadata: Metadata = { title: '发布赛事' };
 export const dynamic = 'force-dynamic';
@@ -41,7 +41,7 @@ export default async function VenueEventNewPage({
             <label className="text-sm">
               <span className={labelCls}>城市 *</span>
               <select name="city" required defaultValue={user.venueProfile?.city ?? '上海'} className={`mt-1 ${inputCls}`}>
-                {CITIES.map((c) => (
+                {ALL_CITIES.map((c) => (
                   <option key={c} value={c}>
                     {c}
                   </option>

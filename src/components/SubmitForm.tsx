@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { CITIES } from '@/lib/constants';
+import { ALL_CITIES } from '@/lib/constants';
 
 const TYPES = [
   { key: 'EVENT_TIP', label: '我要投稿一场比赛', ph: '赛事名称、时间、地点、报名链接或公众号，知道多少写多少' },
@@ -107,7 +107,7 @@ export function SubmitForm({
               onChange={(e) => setCity(e.target.value)}
               className="w-full rounded-lg border border-gray-300 px-3 py-2 outline-none focus:border-brand-500"
             >
-              {CITIES.map((c) => (
+              {ALL_CITIES.map((c) => (
                 <option key={c} value={c}>
                   {c}
                 </option>

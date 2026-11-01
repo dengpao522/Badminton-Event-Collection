@@ -12,7 +12,7 @@ import { prisma } from '@/lib/prisma';
 import { ADMIN_COOKIE, requireAdmin, sessionTokenFor } from '@/lib/auth';
 import { parseDeadline, parseRaceDate } from '@/lib/parse-date';
 import { importWorkbook } from '@/lib/import-events';
-import { CITIES, EVENT_KIND, REG_STATUS } from '@/lib/constants';
+import { ALL_CITIES, EVENT_KIND, REG_STATUS } from '@/lib/constants';
 
 /** 登录：校验 ADMIN_PASSWORD，写 7 天会话 Cookie */
 export async function loginAction(formData: FormData) {
@@ -200,8 +200,8 @@ export async function importSheetAction(formData: FormData) {
   const city = String(formData.get('city') ?? '');
   const file = formData.get('file');
 
-  // 服务端校验：城市合法 + 文件为 xlsx
-  if (!CITIES.includes(city as (typeof CITIES)[number])) {
+  // 服务端校验：城市合法（全国全集，羽毛球站数据覆盖全国）+ 文件为 xlsx
+  if (!ALL_CITIES.includes(city)) {
     redirect(`/admin/import?error=${encodeURIComponent('请选择清单归属城市')}`);
   }
   if (!(file instanceof File) || file.size === 0) {

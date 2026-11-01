@@ -68,6 +68,14 @@ export const SOON_CITIES: string[] = [
 ];
 export type City = (typeof CITIES)[number];
 
+/**
+ * 全国城市全集 = 已开通城市（CITIES）+ 即将开通城市（SOON_CITIES）。
+ * 羽毛球站数据覆盖全国（库里已有北京/深圳/重庆/西安等城市赛事），
+ * 球馆发布、用户投稿、后台导入的城市下拉与校验都应使用全集，
+ * 只用 CITIES（江浙沪试点名单）会把全国用户卡在表单外。
+ */
+export const ALL_CITIES: string[] = [...CITIES, ...SOON_CITIES];
+
 // 前台城市筛选只直接展示的热门城市（其余城市走「全部地区」省市级联面板）
 export const HOT_CITIES = [
   '北京', '上海', '广州', '深圳', '成都', '杭州', '南京', '武汉', '重庆', '西安',

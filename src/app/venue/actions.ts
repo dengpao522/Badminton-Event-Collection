@@ -7,7 +7,7 @@ import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
 import { prisma } from '@/lib/prisma';
 import { getCurrentUser, isApprovedVenue } from '@/lib/session';
-import { CITIES } from '@/lib/constants';
+import { ALL_CITIES } from '@/lib/constants';
 import { parseDeadline, parseRaceDate } from '@/lib/parse-date';
 
 /** 提交球馆认证申请（每用户一份，驳回后可修改重新提交） */
@@ -21,7 +21,8 @@ export async function applyVenueAction(formData: FormData) {
   const phone = String(formData.get('phone') ?? '').trim();
   const intro = String(formData.get('intro') ?? '').trim().slice(0, 500);
 
-  if (!venueName || !CITIES.includes(city as (typeof CITIES)[number]) || !phone) {
+  // 全国城市全集校验：羽毛球站覆盖全国，不能只限江浙沪试点名单
+  if (!venueName || !ALL_CITIES.includes(city) || !phone) {
     redirect(`/venue/apply?error=${encodeURIComponent('请完整填写球馆名称、城市与联系电话')}`);
   }
 
@@ -64,7 +65,7 @@ export async function submitVenueEventAction(formData: FormData) {
   if (!name || !city || !raceDateText) {
     redirect(`/venue/events/new?error=${encodeURIComponent('赛事名称、城市、比赛日期为必填项')}`);
   }
-  if (!CITIES.includes(city as (typeof CITIES)[number])) {
+  if (!ALL_CITIES.includes(city)) {
     redirect(`/venue/events/new?error=${encodeURIComponent('城市取值不合法')}`);
   }
   if (registerUrl && !/^https?:\/\//i.test(registerUrl)) {
