@@ -47,11 +47,13 @@ export async function toggleLikeAction(formData: FormData) {
     await prisma.like.delete({ where: { id: existing.id } });
     await prisma.post.update({ where: { id: postId }, data: { likeCount: { decrement: 1 } } });
   } else {
+    // 先确认帖子存在：直接构造请求伪造 postId 会触发外键约束异常（500），此处优雅回退
+    const post = await prisma.post.findUnique({ where: { id: postId }, select: { userId: true } });
+    if (!post) redirect(back);
     await prisma.like.create({ data: { postId, userId: user.id } });
     await prisma.post.update({ where: { id: postId }, data: { likeCount: { increment: 1 } } });
     // 通知帖主（自己的赞不通知）
-    const post = await prisma.post.findUnique({ where: { id: postId }, select: { userId: true } });
-    if (post && post.userId !== user.id) {
+    if (post.userId !== user.id) {
       await prisma.notification.create({
         data: { userId: post.userId, actorId: user.id, type: 'LIKE', postId },
       });
@@ -69,12 +71,15 @@ export async function createCommentAction(formData: FormData) {
   const content = String(formData.get('content') ?? '').trim().slice(0, 500);
   if (!postId || !content) redirect('/community');
 
+  // 先确认帖子存在：伪造 postId 会触发外键约束异常（500），此处优雅回退
+  const post = await prisma.post.findUnique({ where: { id: postId }, select: { userId: true } });
+  if (!post) redirect('/community');
+
   await prisma.comment.create({ data: { postId, userId: user.id, content } });
   await prisma.post.update({ where: { id: postId }, data: { commentCount: { increment: 1 } } });
 
   // 通知帖主（自己的评论不通知）
-  const post = await prisma.post.findUnique({ where: { id: postId }, select: { userId: true } });
-  if (post && post.userId !== user.id) {
+  if (post.userId !== user.id) {
     await prisma.notification.create({
       data: { userId: post.userId, actorId: user.id, type: 'COMMENT', postId },
     });

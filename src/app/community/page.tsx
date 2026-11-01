@@ -10,6 +10,16 @@ export const dynamic = 'force-dynamic';
 
 const PAGE_SIZE = 20;
 
+/** 容错解析帖子图片 JSON：脏数据（非法 JSON/非数组）降级为空数组，避免整页 500 */
+function parseImages(raw: string): string[] {
+  try {
+    const parsed: unknown = JSON.parse(raw || '[]');
+    return Array.isArray(parsed) ? parsed.map(String) : [];
+  } catch {
+    return [];
+  }
+}
+
 /** 时间的人话展示：N 分钟前 / N 小时前 / 日期 */
 function timeAgo(date: Date): string {
   const diff = Date.now() - date.getTime();
@@ -106,7 +116,7 @@ export default async function CommunityPage({
 
       <div className="mt-5 space-y-4">
         {list.map((post) => {
-          const images: string[] = JSON.parse(post.images || '[]');
+          const images = parseImages(post.images);
           const liked = Array.isArray(post.likes) && post.likes.length > 0;
           return (
             <article key={post.id} className="rounded-2xl border border-gray-200 bg-white p-5">

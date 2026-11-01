@@ -22,11 +22,15 @@ export async function getCurrentUser() {
   return session.user;
 }
 
-/** 创建会话并写入 cookie（注册/登录成功后调用） */
+/** 创建会话并写入 cookie（注册/登录成功后调用）；顺带清理过期会话防表膨胀 */
 export async function createSession(userId: string): Promise<void> {
   const token = randomBytes(24).toString('hex');
   const expiresAt = new Date(Date.now() + SESSION_DAYS * 86400_000);
   await prisma.session.create({ data: { userId, token, expiresAt } });
+  // 卫生：该用户已过期的会话顺手删掉（防长期运行 Session 表无限增长）
+  await prisma.session.deleteMany({
+    where: { userId, expiresAt: { lt: new Date() } },
+  });
   const store = await cookies();
   store.set(SESSION_COOKIE, token, {
     httpOnly: true,

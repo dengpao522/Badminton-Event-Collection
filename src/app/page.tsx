@@ -1,6 +1,6 @@
 import { Discovery } from '@/components/Discovery';
 import type { EventCardData } from '@/components/EventCard';
-import { getPublishedEvents } from '@/lib/events';
+import { getPublishedEvents, parseTags } from '@/lib/events';
 
 // 数据运营频繁更新，禁用静态缓存，保证每次请求取最新赛事状态
 export const dynamic = 'force-dynamic';
@@ -14,7 +14,8 @@ export default async function HomePage() {
     name: e.name,
     city: e.city,
     category: e.category,
-    tags: JSON.parse(e.tags) as string[],
+    // parseTags 容错解析：tags 存脏数据（非法 JSON）时不至于整页 500
+    tags: parseTags(e.tags),
     status: e.status,
     kind: e.kind,
     verifyStatus: e.verifyStatus,
