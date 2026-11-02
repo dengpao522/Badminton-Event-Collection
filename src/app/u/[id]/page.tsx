@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma';
 import { getCurrentUser } from '@/lib/session';
 import { toggleFollowAction } from './actions';
 import { Avatar } from '@/components/Avatar';
+import { getUserLevel } from '@/lib/level';
 
 export const dynamic = 'force-dynamic';
 
@@ -46,6 +47,8 @@ export default async function UserProfilePage({
 
   const isMe = me?.id === id;
   const venue = user.venueProfile?.status === 'APPROVED' ? user.venueProfile : null;
+  // 等级徽章（发帖×5 + 获赞，实时计算）
+  const level = await getUserLevel(prisma, id);
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-8">
@@ -56,6 +59,10 @@ export default async function UserProfilePage({
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
               <h1 className="text-lg font-extrabold text-gray-900">{user.name}</h1>
+              {/* 等级徽章：内容贡献可视化，促进身份认同 */}
+              <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${level.cls}`}>
+                {level.label}
+              </span>
               {venue && (
                 <span className="rounded-full bg-brand-50 px-2.5 py-0.5 text-xs font-semibold text-brand-700">
                   🏸 认证球馆 · {venue.venueName}
@@ -68,27 +75,35 @@ export default async function UserProfilePage({
               <b className="text-gray-600">{followingCount}</b> 关注
             </p>
           </div>
-          {/* 关注按钮：非本人且已登录时展示 */}
+          {/* 操作按钮：非本人时关注 + 私信 */}
           {!isMe && me && (
-            <form action={toggleFollowAction}>
-              <input type="hidden" name="targetId" value={id} />
-              <input type="hidden" name="back" value={`/u/${id}`} />
-              <button
-                type="submit"
-                className={`rounded-lg px-4 py-1.5 text-xs font-bold ${
-                  myFollow
-                    ? 'border border-gray-300 text-gray-600 hover:bg-gray-50'
-                    : 'bg-brand-500 text-white hover:bg-brand-600'
-                }`}
+            <div className="flex shrink-0 flex-col gap-2">
+              <form action={toggleFollowAction}>
+                <input type="hidden" name="targetId" value={id} />
+                <input type="hidden" name="back" value={`/u/${id}`} />
+                <button
+                  type="submit"
+                  className={`w-full rounded-lg px-4 py-1.5 text-xs font-bold ${
+                    myFollow
+                      ? 'border border-gray-300 text-gray-600 hover:bg-gray-50'
+                      : 'bg-brand-500 text-white hover:bg-brand-600'
+                  }`}
+                >
+                  {myFollow ? '已关注（点击取关）' : '+ 关注'}
+                </button>
+              </form>
+              <Link
+                href={`/messages/${id}`}
+                className="rounded-lg border border-gray-300 px-4 py-1.5 text-center text-xs font-bold text-gray-600 hover:bg-gray-50"
               >
-                {myFollow ? '已关注（点击取关）' : '+ 关注'}
-              </button>
-            </form>
+                💬 私信
+              </Link>
+            </div>
           )}
           {!me && (
             <Link
               href={`/login?error=${encodeURIComponent('关注球友需要先登录')}`}
-              className="rounded-lg bg-brand-500 px-4 py-1.5 text-xs font-bold text-white hover:bg-brand-600"
+              className="shrink-0 rounded-lg bg-brand-500 px-4 py-1.5 text-xs font-bold text-white hover:bg-brand-600"
             >
               + 关注
             </Link>

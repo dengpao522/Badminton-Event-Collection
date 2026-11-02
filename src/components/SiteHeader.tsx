@@ -9,13 +9,18 @@ import { Avatar } from './Avatar';
 export async function SiteHeader() {
   const user = await getCurrentUser();
   const isVenue = user?.venueProfile?.status === 'APPROVED';
-  // 未读通知数（已登录才查；查询失败按 0 处理不阻塞渲染）
+  // 未读通知数 + 未读私信数（已登录才查；查询失败按 0 处理不阻塞渲染）
   let unread = 0;
+  let unreadMsg = 0;
   if (user) {
     try {
-      unread = await prisma.notification.count({ where: { userId: user.id, read: false } });
+      [unread, unreadMsg] = await Promise.all([
+        prisma.notification.count({ where: { userId: user.id, read: false } }),
+        prisma.message.count({ where: { receiverId: user.id, read: false } }),
+      ]);
     } catch {
       unread = 0;
+      unreadMsg = 0;
     }
   }
 
@@ -82,6 +87,19 @@ export async function SiteHeader() {
                 {unread > 0 && (
                   <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
                     {unread > 9 ? '9+' : unread}
+                  </span>
+                )}
+              </Link>
+              {/* 私信入口（未读红点；小屏只留图标） */}
+              <Link
+                href="/messages"
+                aria-label="私信"
+                className="relative shrink-0 rounded-md px-1.5 py-1.5 text-lg hover:bg-gray-100 sm:px-2"
+              >
+                💬
+                {unreadMsg > 0 && (
+                  <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+                    {unreadMsg > 9 ? '9+' : unreadMsg}
                   </span>
                 )}
               </Link>

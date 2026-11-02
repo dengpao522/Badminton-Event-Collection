@@ -76,6 +76,11 @@ export type City = (typeof CITIES)[number];
  */
 export const ALL_CITIES: string[] = [...CITIES, ...SOON_CITIES];
 
+// 社区话题标签（发帖单选；空 = 不选即「闲聊」随笔）
+// 顺序即社区筛选 chips 的展示顺序
+export const TOPICS = ['球友闲聊', '比赛战报', '装备讨论', '技术交流', '约球拼场', '球馆探店'] as const;
+export type Topic = (typeof TOPICS)[number];
+
 // 前台城市筛选只直接展示的热门城市（其余城市走「全部地区」省市级联面板）
 export const HOT_CITIES = [
   '北京', '上海', '广州', '深圳', '成都', '杭州', '南京', '武汉', '重庆', '西安',

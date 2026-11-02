@@ -68,6 +68,8 @@ model Event {
   // 球馆发布者：运营采集的赛事为 null；球馆发布的记录提交用户（审核通过后上架）
   submittedByUserId String?
   submittedBy       User?   @relation(fields: [submittedByUserId], references: [id], onDelete: SetNull)
+  // 社区讨论区：关联赛事的帖子（赛事详情页「赛事讨论」数据源）
+  discussionPosts Post[]
 
   @@index([city, category, status])
   @@index([raceDateStart])
@@ -154,6 +156,11 @@ model User {
   // 站内通知：我收到的 / 我触发的
   notifications Notification[] @relation("notificationOwner")
   notifiedActions Notification[] @relation("notificationActor")
+  // 评论回复目标（我回复了谁的哪些评论）
+  repliedComments Comment[] @relation("commentReplyTo")
+  // 私信：我发出的 / 我收到的
+  sentMessages     Message[] @relation("messageSender")
+  receivedMessages Message[] @relation("messageReceiver")
 }
 
 // ---------- 登录会话（httpOnly cookie → session token）----------
@@ -193,6 +200,11 @@ model Post {
   title  String @default("") // 标题（可空，随笔类）
   content String // 正文
   images String @default("[]") // 图片路径 JSON 数组（public/uploads 相对路径）
+  // 话题标签：取值见 src/lib/constants.ts 的 TOPICS（空 = 未分类随笔）
+  topic String @default("")
+  // 关联赛事：赛事讨论区（赛事详情页展示关联帖；赛事删除后置空不删帖）
+  eventId String?
+  event   Event?  @relation(fields: [eventId], references: [id], onDelete: SetNull)
   likeCount    Int @default(0) // 点赞数（冗余计数，展示用）
   commentCount Int @default(0) // 评论数（冗余计数，展示用）
   createdAt DateTime @default(now())
@@ -202,6 +214,7 @@ model Post {
 
   @@index([createdAt])
   @@index([userId])
+  @@index([eventId])
 }
 
 // ---------- 帖子评论 ----------
@@ -212,9 +225,27 @@ model Comment {
   userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
   content String
+  // 盖楼回复：回复目标评论的作者（null = 直接评论帖主，不指向某条评论）
+  replyToUserId String?
+  replyTo       User?   @relation("commentReplyTo", fields: [replyToUserId], references: [id], onDelete: SetNull)
   createdAt DateTime @default(now())
 
   @@index([postId])
+}
+
+// ---------- 私信（点对点，无会话表：按 (min,max) 双方 ID 在查询层聚合会话）----------
+model Message {
+  id     String @id @default(cuid())
+  senderId String
+  sender   User @relation("messageSender", fields: [senderId], references: [id], onDelete: Cascade)
+  receiverId String
+  receiver   User @relation("messageReceiver", fields: [receiverId], references: [id], onDelete: Cascade)
+  content String // 500 字内
+  read   Boolean @default(false) // 接收方是否已读
+  createdAt DateTime @default(now())
+
+  @@index([receiverId, read])
+  @@index([senderId])
 }
 
 // ---------- 帖子点赞（一人一帖最多一赞）----------

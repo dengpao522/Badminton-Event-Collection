@@ -8,6 +8,8 @@ import { EventSubscribe } from '@/components/EventSubscribe';
 import { CopyGuide } from '@/components/CopyGuide';
 import { EVENT_KIND } from '@/lib/constants';
 import { SITE_URL } from '@/lib/site';
+import { prisma } from '@/lib/prisma';
+import { Avatar } from '@/components/Avatar';
 
 export const dynamic = 'force-dynamic';
 
@@ -38,6 +40,17 @@ export default async function EventDetailPage({
   const { id } = await params;
   const ev = await getEventById(id);
   if (!ev || !ev.isPublished) notFound();
+
+  // 赛事讨论区：关联赛事的最新帖子（前 5 条），与社区共用 Post 数据
+  const discussions = await prisma.post.findMany({
+    where: { eventId: id },
+    orderBy: { createdAt: 'desc' },
+    take: 5,
+    include: {
+      user: { select: { id: true, name: true, avatar: true } },
+      _count: { select: { comments: true } },
+    },
+  });
 
   // SportsEvent 结构化数据：name/时间/地点/状态，帮助搜索引擎生成富摘要
   const jsonLd = {
@@ -181,6 +194,48 @@ export default async function EventDetailPage({
           <p className="mt-3 text-center text-xs text-gray-400">
             报名与支付均在官方渠道完成，本站不经手任何费用
           </p>
+        )}
+      </div>
+
+      {/* 赛事讨论区：报名找搭子 / 赛后发战报，与社区共用帖子数据（发帖时关联赛事即出现在这里） */}
+      <div className="mt-5 rounded-2xl border border-gray-200 bg-white p-6">
+        <div className="flex items-center justify-between">
+          <h2 className="text-base font-extrabold text-gray-900">赛事讨论</h2>
+          <Link
+            href={`/community/new?eventId=${ev.id}`}
+            className="rounded-lg bg-brand-500 px-3 py-1.5 text-xs font-bold text-white hover:bg-brand-600"
+          >
+            + 参与讨论
+          </Link>
+        </div>
+        {discussions.length > 0 ? (
+          <div className="mt-4 space-y-3">
+            {discussions.map((d) => (
+              <Link
+                key={d.id}
+                href={`/community?topic=${encodeURIComponent(d.topic)}`}
+                className="flex items-center gap-3 rounded-xl border border-gray-100 p-3 hover:border-brand-200 hover:bg-brand-50/40"
+              >
+                <Avatar name={d.user.name} avatar={d.user.avatar} size={32} />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-bold text-gray-900">
+                    {d.title || d.content.slice(0, 40)}
+                  </p>
+                  <p className="mt-0.5 truncate text-xs text-gray-400">
+                    {d.user.name} · {d.content.slice(0, 60)}
+                  </p>
+                </div>
+                <span className="shrink-0 text-xs text-gray-400">{d._count.comments} 评论</span>
+              </Link>
+            ))}
+          </div>
+        ) : (
+          <div className="mt-4 rounded-xl border border-dashed border-gray-300 px-4 py-8 text-center">
+            <p className="text-sm font-semibold text-gray-600">还没有球友讨论这场比赛</p>
+            <p className="mt-1 text-xs text-gray-400">
+              找搭子、问报名、赛后聊战况——点右上角「参与讨论」发第一帖
+            </p>
+          </div>
         )}
       </div>
 
