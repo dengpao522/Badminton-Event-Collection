@@ -9,7 +9,7 @@ import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
 import { prisma } from '@/lib/prisma';
 import { getCurrentUser } from '@/lib/session';
-import { saveImages } from '@/lib/upload';
+import { saveImages, deleteUploads } from '@/lib/upload';
 import { TOPICS } from '@/lib/constants';
 
 /** 发帖：标题可选，正文必填（5000 字内），图片 ≤4 张；话题单选 + 可关联赛事（赛事讨论区） */
@@ -75,6 +75,62 @@ export async function toggleLikeAction(formData: FormData) {
   }
   revalidatePath(back);
   redirect(back);
+}
+
+/** 删除自己的帖子（UGC 平台合规要求：用户可删除自己发布的内容）。
+ *  评论/点赞/收藏随外键级联删除；帖内图片文件一并清理防磁盘残留 */
+export async function deletePostAction(formData: FormData) {
+  const user = await getCurrentUser();
+  if (!user) redirect(`/login?error=${encodeURIComponent('请先登录')}`);
+  const postId = String(formData.get('postId') ?? '');
+  const back = String(formData.get('back') ?? '/community');
+
+  // 只能删自己的帖子：不归属时静默回退（不暴露帖子是否存在）
+  const post = await prisma.post.findUnique({
+    where: { id: postId },
+    select: { userId: true, images: true, eventId: true },
+  });
+  if (!post || post.userId !== user.id) redirect(back);
+
+  await prisma.post.delete({ where: { id: postId } });
+  await deleteUploads(parseImagePaths(post.images));
+  if (post.eventId) revalidatePath(`/events/${post.eventId}`);
+  revalidatePath('/community');
+  revalidatePath(`/u/${user.id}`);
+  redirect(back);
+}
+
+/** 删除自己的评论；同步扣减帖子评论计数 */
+export async function deleteCommentAction(formData: FormData) {
+  const user = await getCurrentUser();
+  if (!user) redirect(`/login?error=${encodeURIComponent('请先登录')}`);
+  const commentId = String(formData.get('commentId') ?? '');
+  const back = String(formData.get('back') ?? '/community');
+
+  // 只能删自己的评论：不归属时静默回退
+  const comment = await prisma.comment.findUnique({
+    where: { id: commentId },
+    select: { userId: true, postId: true },
+  });
+  if (!comment || comment.userId !== user.id) redirect(back);
+
+  await prisma.comment.delete({ where: { id: commentId } });
+  await prisma.post.update({
+    where: { id: comment.postId },
+    data: { commentCount: { decrement: 1 } },
+  });
+  revalidatePath('/community');
+  redirect(back);
+}
+
+/** 容错解析帖子图片 JSON（与社区页同口径），供删帖时清理文件 */
+function parseImagePaths(raw: string): string[] {
+  try {
+    const parsed: unknown = JSON.parse(raw || '[]');
+    return Array.isArray(parsed) ? parsed.map(String) : [];
+  } catch {
+    return [];
+  }
 }
 
 /** 收藏 / 取消收藏（幂等切换）；主页「收藏」tab 仅本人可见，不触发通知 */

@@ -3,7 +3,7 @@ import { notFound } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
 import { getCurrentUser } from '@/lib/session';
 import { toggleFollowAction } from './actions';
-import { toggleBookmarkAction } from '../../community/actions';
+import { toggleBookmarkAction, deletePostAction } from '../../community/actions';
 import { Avatar } from '@/components/Avatar';
 import { getUserLevel } from '@/lib/level';
 
@@ -231,12 +231,28 @@ export default async function UserProfilePage({
       <section className="mt-4 space-y-3">
         {activeTab === 'works' &&
           workPosts.map((post) => (
-            <PostCard
-              key={post.id}
-              title={post.title}
-              content={post.content}
-              meta={`${post.createdAt.toLocaleDateString('zh-CN')} · ${post.likeCount} 赞 · ${post.commentCount} 评论 · ${post.bookmarkCount} 收藏`}
-            />
+            <div key={post.id}>
+              <PostCard
+                title={post.title}
+                content={post.content}
+                meta={`${post.createdAt.toLocaleDateString('zh-CN')} · ${post.likeCount} 赞 · ${post.commentCount} 评论 · ${post.bookmarkCount} 收藏`}
+              />
+              {/* 删除自己的作品（本人主页可见，details 展开防误触） */}
+              {isMe && (
+                <details className="mt-1">
+                  <summary className="w-fit cursor-pointer select-none text-xs text-gray-300 hover:text-gray-500">
+                    ⋯
+                  </summary>
+                  <form action={deletePostAction} className="mt-1">
+                    <input type="hidden" name="postId" value={post.id} />
+                    <input type="hidden" name="back" value={`/u/${id}`} />
+                    <button type="submit" className="text-xs font-semibold text-red-500 hover:bg-red-50 rounded-md px-2 py-1">
+                      删除作品
+                    </button>
+                  </form>
+                </details>
+              )}
+            </div>
           ))}
         {activeTab === 'bookmarks' &&
           bookmarkRows.map((b) => (

@@ -2,7 +2,7 @@ import Link from 'next/link';
 import type { Metadata } from 'next';
 import { prisma } from '@/lib/prisma';
 import { getCurrentUser } from '@/lib/session';
-import { toggleLikeAction, createCommentAction, toggleBookmarkAction } from './actions';
+import { toggleLikeAction, createCommentAction, toggleBookmarkAction, deletePostAction, deleteCommentAction } from './actions';
 import { Avatar } from '@/components/Avatar';
 import { TOPICS } from '@/lib/constants';
 import { getUserLevel } from '@/lib/level';
@@ -186,6 +186,24 @@ export default async function CommunityPage({
                   </div>
                   <p className="text-xs text-gray-400">{timeAgo(post.createdAt)}</p>
                 </div>
+                {/* 删除自己的帖子（仅作者可见，details 展开二次确认防误触） */}
+                {me?.id === post.user.id && (
+                  <details className="ml-auto shrink-0">
+                    <summary className="cursor-pointer select-none list-none rounded-md px-2 py-1 text-xs text-gray-300 hover:bg-gray-100 hover:text-gray-500">
+                      ⋯
+                    </summary>
+                    <form action={deletePostAction} className="mt-1 text-right">
+                      <input type="hidden" name="postId" value={post.id} />
+                      <input type="hidden" name="back" value={back} />
+                      <button
+                        type="submit"
+                        className="rounded-md px-2 py-1 text-xs font-semibold text-red-500 hover:bg-red-50"
+                      >
+                        删除作品
+                      </button>
+                    </form>
+                  </details>
+                )}
               </div>
 
               {/* 话题 + 关联赛事标记 */}
@@ -276,6 +294,16 @@ export default async function CommunityPage({
                           <span className="text-gray-400"> 回复 @{c.replyTo.name}</span>
                         )}
                         ：{c.content}
+                        {/* 删除自己的评论（仅作者可见） */}
+                        {me?.id === c.user.id && (
+                          <form action={deleteCommentAction} className="ml-1.5 inline">
+                            <input type="hidden" name="commentId" value={c.id} />
+                            <input type="hidden" name="back" value={back} />
+                            <button type="submit" className="text-gray-300 hover:text-red-500">
+                              删除
+                            </button>
+                          </form>
+                        )}
                       </p>
                       {/* 回复入口：details/summary 无 JS 展开，提交后带 replyTo 盖楼 */}
                       {me && (
