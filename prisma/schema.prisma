@@ -161,6 +161,8 @@ model User {
   // 私信：我发出的 / 我收到的
   sentMessages     Message[] @relation("messageSender")
   receivedMessages Message[] @relation("messageReceiver")
+  // 收藏的帖子（主页「收藏」tab，仅本人可见）
+  bookmarks Bookmark[]
 }
 
 // ---------- 登录会话（httpOnly cookie → session token）----------
@@ -207,10 +209,12 @@ model Post {
   event   Event?  @relation(fields: [eventId], references: [id], onDelete: SetNull)
   likeCount    Int @default(0) // 点赞数（冗余计数，展示用）
   commentCount Int @default(0) // 评论数（冗余计数，展示用）
+  bookmarkCount Int @default(0) // 收藏数（冗余计数，展示用）
   createdAt DateTime @default(now())
 
   comments Comment[]
   likes    Like[]
+  bookmarks Bookmark[]
 
   @@index([createdAt])
   @@index([userId])
@@ -258,6 +262,19 @@ model Like {
   createdAt DateTime @default(now())
 
   @@unique([postId, userId])
+}
+
+// ---------- 帖子收藏（一人一帖最多一藏；主页收藏 tab 仅本人可见）----------
+model Bookmark {
+  id     String @id @default(cuid())
+  postId String
+  post   Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([postId, userId])
+  @@index([userId])
 }
 
 // ---------- 站内通知（被关注/被评论/被点赞）----------

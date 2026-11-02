@@ -2,7 +2,7 @@ import Link from 'next/link';
 import type { Metadata } from 'next';
 import { prisma } from '@/lib/prisma';
 import { getCurrentUser } from '@/lib/session';
-import { toggleLikeAction, createCommentAction } from './actions';
+import { toggleLikeAction, createCommentAction, toggleBookmarkAction } from './actions';
 import { Avatar } from '@/components/Avatar';
 import { TOPICS } from '@/lib/constants';
 import { getUserLevel } from '@/lib/level';
@@ -67,8 +67,9 @@ export default async function CommunityPage({
     include: {
       user: { select: { id: true, name: true, avatar: true } },
       event: { select: { id: true, name: true } }, // 关联赛事（讨论区来源标记）
-      // 当前用户是否已点赞（用于按钮态）
+      // 当前用户是否已点赞 / 已收藏（用于按钮态）
       likes: me ? { where: { userId: me.id }, select: { id: true } } : false,
+      bookmarks: me ? { where: { userId: me.id }, select: { id: true } } : false,
       // 评论全量（正序），含作者名与盖楼回复目标
       comments: {
         orderBy: { createdAt: 'asc' },
@@ -164,6 +165,7 @@ export default async function CommunityPage({
         {list.map((post) => {
           const images = parseImages(post.images);
           const liked = Array.isArray(post.likes) && post.likes.length > 0;
+          const bookmarked = Array.isArray(post.bookmarks) && post.bookmarks.length > 0;
           const level = levelCache.get(post.user.id)!;
           const back = pageHref(pageNum);
           return (
@@ -223,21 +225,37 @@ export default async function CommunityPage({
               <div className="mt-3 flex items-center gap-4 border-t border-gray-100 pt-3 text-xs text-gray-500">
                 <span>
                   <b className="text-gray-700">{post.likeCount}</b> 赞 ·{' '}
-                  <b className="text-gray-700">{post.comments.length}</b> 评论
+                  <b className="text-gray-700">{post.comments.length}</b> 评论 ·{' '}
+                  <b className="text-gray-700">{post.bookmarkCount}</b> 收藏
                 </span>
                 {me ? (
-                  <form action={toggleLikeAction}>
-                    <input type="hidden" name="postId" value={post.id} />
-                    <input type="hidden" name="back" value={back} />
-                    <button
-                      type="submit"
-                      className={`rounded-full px-2 py-1 font-semibold hover:bg-gray-100 ${
-                        liked ? 'text-red-500' : 'text-gray-500'
-                      }`}
-                    >
-                      {liked ? '♥' : '♡'} 点赞
-                    </button>
-                  </form>
+                  <>
+                    <form action={toggleLikeAction}>
+                      <input type="hidden" name="postId" value={post.id} />
+                      <input type="hidden" name="back" value={back} />
+                      <button
+                        type="submit"
+                        className={`rounded-full px-2 py-1 font-semibold hover:bg-gray-100 ${
+                          liked ? 'text-red-500' : 'text-gray-500'
+                        }`}
+                      >
+                        {liked ? '♥' : '♡'} 点赞
+                      </button>
+                    </form>
+                    {/* 收藏：存进主页「收藏」tab（仅本人可见） */}
+                    <form action={toggleBookmarkAction}>
+                      <input type="hidden" name="postId" value={post.id} />
+                      <input type="hidden" name="back" value={back} />
+                      <button
+                        type="submit"
+                        className={`rounded-full px-2 py-1 font-semibold hover:bg-gray-100 ${
+                          bookmarked ? 'text-amber-500' : 'text-gray-500'
+                        }`}
+                      >
+                        {bookmarked ? '★ 已收藏' : '☆ 收藏'}
+                      </button>
+                    </form>
+                  </>
                 ) : (
                   <Link href="/login" className="text-brand-600 hover:underline">
                     登录后可点赞评论

@@ -77,6 +77,30 @@ export async function toggleLikeAction(formData: FormData) {
   redirect(back);
 }
 
+/** 收藏 / 取消收藏（幂等切换）；主页「收藏」tab 仅本人可见，不触发通知 */
+export async function toggleBookmarkAction(formData: FormData) {
+  const user = await getCurrentUser();
+  if (!user) redirect(`/login?error=${encodeURIComponent('收藏需要先登录')}`);
+  const postId = String(formData.get('postId') ?? '');
+  const back = String(formData.get('back') ?? '/community');
+
+  const existing = await prisma.bookmark.findUnique({
+    where: { postId_userId: { postId, userId: user.id } },
+  });
+  if (existing) {
+    await prisma.bookmark.delete({ where: { id: existing.id } });
+    await prisma.post.update({ where: { id: postId }, data: { bookmarkCount: { decrement: 1 } } });
+  } else {
+    // 先确认帖子存在：伪造 postId 会触发外键约束异常（500），此处优雅回退
+    const post = await prisma.post.findUnique({ where: { id: postId }, select: { id: true } });
+    if (!post) redirect(back);
+    await prisma.bookmark.create({ data: { postId, userId: user.id } });
+    await prisma.post.update({ where: { id: postId }, data: { bookmarkCount: { increment: 1 } } });
+  }
+  revalidatePath(back);
+  redirect(back);
+}
+
 /** 发表评论（可盖楼回复某条评论）；评论时给帖主/被回复人发通知 */
 export async function createCommentAction(formData: FormData) {
   const user = await getCurrentUser();
